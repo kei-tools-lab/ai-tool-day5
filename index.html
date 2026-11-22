@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>サーフボード適正浮力（CL値）診断ツール | AIツール実験室 Day 5</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --success: #34d399;
+      --warn: #fbbf24;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 20px 16px 60px;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 24px; }
+    .badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    h1 { font-size: 1.45rem; margin-bottom: 6px; }
+    .subtitle { font-size: 0.875rem; color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .val-tag { color: var(--accent); font-weight: bold; }
+    input[type="range"], select { width: 100%; }
+    input[type="range"] { accent-color: var(--accent); cursor: pointer; }
+    select {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+    .result-box {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--success);
+      border-radius: 12px;
+      padding: 18px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .res-label { font-size: 0.8rem; color: var(--muted); }
+    .res-cl { font-size: 2.1rem; font-weight: 800; color: var(--success); margin: 4px 0; }
+    .res-range { font-size: 0.88rem; color: var(--accent); font-weight: 600; }
+    .advice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .mini-box {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.82rem;
+    }
+    .mini-box strong { display: block; color: var(--warn); margin-bottom: 2px; }
+    .cta-box { text-align: center; font-size: 0.875rem; }
+    .cta-box p { color: var(--muted); margin-bottom: 12px; }
+    .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .btn-primary { background: var(--accent); color: #0f172a; }
+    .btn-outline { border: 1px solid var(--border); color: var(--text); }
+    footer { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 20px; }
+    @media (max-width: 500px) { .advice-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">AIエージェント開発実験 Day 5</span>
+      <h1>サーフボード適正浮力（CL値）診断ツール</h1>
+      <p class="subtitle">体重・レベル・波コンディションから「乗りやすい適正リッター数（CL値）」を即時算出</p>
+    </header>
+
+    <div class="card">
+      <div class="field">
+        <label>
+          <span>現在の体重（ウェットスーツ込み目安）</span>
+          <span class="val-tag" id="wtVal">68 kg</span>
+        </label>
+        <input type="range" id="weight" min="45" max="105" step="1" value="68" oninput="calc()">
+      </div>
+
+      <div class="field">
+        <label>サーフィンレベル・経験</label>
+        <select id="level" onchange="calc()">
+          <option value="beginner">ビギナー（テイクオフ安定・横へ走る練習中）</option>
+          <option value="intermediate" selected>インターミディエイト（ターン・アップス＆ダウン可能）</option>
+          <option value="advanced">アドバンス（リップ・掘れた波・クイックな動き重視）</option>
+          <option value="cruising">エンジョイ／小波クルージング重視</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-bottom:0;">
+        <label>メインで入る波のコンディション</label>
+        <select id="wave" onchange="calc()">
+          <option value="small">ヒザ〜モモ・トロめ・パワーレスな小波</option>
+          <option value="waist" selected>コシ〜ハラ・一般的なビーチブレイク</option>
+          <option value="head">アタマ前後・掘れた波・サイズある波</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="result-box">
+        <div class="res-label">適正ボリューム目安（CL値）</div>
+        <div class="res-cl" id="resCl">約 34.0 L</div>
+        <div class="res-range" id="resRange">推奨レンジ：31.5 L 〜 36.5 L</div>
+      </div>
+
+      <div class="advice-grid">
+        <div class="mini-box">
+          <strong>おすすめボード傾向</strong>
+          <span id="boardStyle">パフォーマンス系〜オールラウンドショート／ミッドレングス</span>
+        </div>
+        <div class="mini-box">
+          <strong>パドル＆テイクオフ感</strong>
+          <span id="paddleNote">テイクオフの速さとコントロール性のバランス型</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card cta-box">
+      <p>このツールは「無料AIエージェントだけで毎日Webアプリを作って公開する実験」で生成しました。</p>
+      <div class="btn-group">
+        <a href="https://note.com/sakurai_kei" target="_blank" rel="noopener" class="btn btn-primary">開発の裏側・プロンプトをnoteで見る</a>
+        <a href="https://note.com/sakurai_kei" target="_blank" rel="noopener" class="btn btn-outline">著者：桜井 圭のプロフィール</a>
+      </div>
+    </div>
+
+    <footer>※同じCL値でもロッカー・レール形状・テール幅で乗り味は変わります。目安としてご活用ください。</footer>
+  </div>
+
+  <script>
+    const levelCoeff = {
+      beginner: 0.62,
+      intermediate: 0.48,
+      advanced: 0.38,
+      cruising: 0.56
+    };
+
+    const waveAdjust = {
+      small: 3.0,
+      waist: 0.0,
+      head: -2.5
+    };
+
+    const styleText = {
+      beginner: ['浮力たっぷりのファンボード／ミッドレングス／ソフトボード', 'パドルが楽で波待ち・テイクオフの余裕を最優先'],
+      intermediate: ['オールラウンド系ショートボード／パフォーマンスミッド', '初速のつけやすさとターン・操作性の両立'],
+      advanced: ['ハイパフォーマンスショート／ステップダウン・ステップアップ', '鋭い切り返しと掘れたセクションでのホールド感重視'],
+      cruising: ['ミッドレングス／オルタナティブ・ツイン／フィッシュ', '少ないパドルでスッと滑り出し、グライド感を楽しむ']
+    };
+
+    function calc() {
+      const weight = Number(document.getElementById('weight').value);
+      const level = document.getElementById('level').value;
+      const wave = document.getElementById('wave').value;
+
+      document.getElementById('wtVal').textContent = `${weight} kg`;
+
+      const rawCl = Math.max(18, weight * levelCoeff[level] + waveAdjust[wave]);
+      const low = (rawCl - 2.5).toFixed(1);
+      const high = (rawCl + 2.5).toFixed(1);
+
+      document.getElementById('resCl').textContent = `約 ${rawCl.toFixed(1)} L`;
+      document.getElementById('resRange').textContent = `推奨レンジ：${low} L 〜 ${high} L`;
+      document.getElementById('boardStyle').textContent = styleText[level][0];
+      document.getElementById('paddleNote').textContent = styleText[level][1];
+    }
+
+    calc();
+  </script>
+</body>
+</html>
